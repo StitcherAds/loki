@@ -3,6 +3,8 @@ package heroku
 import (
 	"fmt"
 	"net/http"
+	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -103,6 +105,9 @@ func (h *Target) run() error {
 func (h *Target) drain(w http.ResponseWriter, r *http.Request) {
 	entries := h.handler.Chan()
 	defer r.Body.Close()
+	// extract labels from drain querystring
+	// these are passed in the form ?label.foo=1&label.bar=2
+	drainLabels := getDrainLabels(r.URL)
 	herokuScanner := herokuEncoding.NewDrainScanner(r.Body)
 	for herokuScanner.Scan() {
 		ts := time.Now()
@@ -112,6 +117,11 @@ func (h *Target) drain(w http.ResponseWriter, r *http.Request) {
 		lb.Set("__heroku_drain_app", message.Application)
 		lb.Set("__heroku_drain_proc", message.Process)
 		lb.Set("__heroku_drain_log_id", message.ID)
+
+		// apply labels from drain querystring
+		for key, value := range drainLabels {
+			lb.Set(key, value)
+		}
 
 		if h.config.UseIncomingTimestamp {
 			ts = message.Timestamp
@@ -183,4 +193,17 @@ func (h *Target) Stop() error {
 	h.server.Shutdown()
 	h.handler.Stop()
 	return nil
+}
+
+var labelRe = regexp.MustCompile(`^label\.([a-zA-Z0-9_]+)$`)
+
+func getDrainLabels(u *url.URL) (labels map[string]string) {
+	labels = map[string]string{}
+	for key, value := range u.Query() {
+		m := labelRe.FindStringSubmatch(key)
+		if m != nil {
+			labels[m[1]] = value[0]
+		}
+	}
+	return
 }
