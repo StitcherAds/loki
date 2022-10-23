@@ -1277,6 +1277,20 @@ The `server` configuration is the same as [server](#server), since Promtail expo
 
 Promtail exposes an endpoint at `/heroku/api/v1/drain`, which expects requests from Heroku's log delivery.
 
+You may use the same endpoint for multiple heroku drains by adding labels to the drain url to identify the source of the logs.
+
+This is particularly useful if you are also hosting Promtail on Heroku where only one port is open to http traffic.
+
+e.g.
+- app1 drain url: `https://promtail.herokuapp.com/heroku/api/v1/drain?label.service=app1`
+- app2 drain url: `https://promtail.herokuapp.com/heroku/api/v1/drain?label.service=app2`
+
+In this scenario, logs from app1 will be labelled with `service: app1` and logs from app2 will be labelled with `service: app2`.
+
+Labels must be in the format `label.([a-zA-Z0-9_]+)`.
+
+You may use more than one label.
+
 ```yaml
 # The Heroku drain server configuration options
 [server: <server_config>]
